@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Synth</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Compile order matters in F#: types, services, shared UI, tabs, app. -->
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Services/AudioEngine.fs" />
+    <Compile Include="Services/MidiInput.fs" />
+    <Compile Include="Services/PresetManager.fs" />
+    <Compile Include="Components/Common.fs" />
+    <Compile Include="Components/DashboardTab.fs" />
+    <Compile Include="Components/OscillatorTab.fs" />
+    <Compile Include="Components/FilterTab.fs" />
+    <Compile Include="Components/EnvelopeTab.fs" />
+    <Compile Include="Components/EffectsTab.fs" />
+    <Compile Include="Components/SamplesTab.fs" />
+    <Compile Include="Components/PresetsTab.fs" />
+    <Compile Include="App.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="4.3.0" />
+    <PackageReference Include="Fable.Browser.Dom" Version="2.16.0" />
+    <PackageReference Include="Fable.Browser.Blob" Version="1.3.0" />
+    <PackageReference Include="Fable.Browser.Url" Version="1.3.0" />
+    <PackageReference Include="Fable.Browser.WebStorage" Version="1.2.0" />
+    <PackageReference Include="Fable.Elmish" Version="4.2.0" />
+    <PackageReference Include="Feliz" Version="2.8.0" />
+    <PackageReference Include="Feliz.UseElmish" Version="2.5.0" />
+    <PackageReference Include="Thoth.Json" Version="10.2.0" />
+  </ItemGroup>
+
+</Project>

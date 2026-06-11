@@ -1,0 +1,39 @@
+/* CleanMyMac-inspired design tokens (dark mode is the primary theme). */
+:root {
+  /* Backgrounds */
+  --bg-primary: #0f172a;   /* deep navy */
+  --bg-secondary: #1a202c; /* slightly lighter */
+  --bg-tertiary: #273551;  /* cards / panels */
+
+  /* Text */
+  --text-primary: #f5f7fa;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  /* Accents */
+  --accent-primary: #00d4ff;   /* cyan */
+  --accent-secondary: #a855f7; /* purple */
+  --accent-success: #10b981;   /* green */
+  --accent-danger: #f87171;    /* red */
+
+  /* Neutral */
+  --border-color: #334155;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+
+  /* Spacing (8px baseline grid) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Motion */
+  --transition: 200ms ease;
+}
