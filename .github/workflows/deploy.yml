@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# A new push cancels any still-running deploy for the same ref, so a wedged
+# run can't block the queue.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 # peaceiris/actions-gh-pages pushes the built site to the gh-pages branch.
 permissions:
   contents: write
@@ -13,6 +19,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Local builds take ~30s; anything past 15 minutes is a hang, not work.
+    timeout-minutes: 15
+
+    env:
+      DOTNET_NOLOGO: 1
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      # MSBuild worker reuse leaves background processes holding the step's
+      # output pipes open, which makes CI steps hang after the build is done.
+      MSBUILDDISABLENODEREUSE: 1
 
     steps:
     - uses: actions/checkout@v4
@@ -29,14 +44,20 @@ jobs:
         cache: 'npm'
 
     # npm ci also runs the postinstall hook (dotnet tool restore), so the
-    # Fable compiler is ready before the build step.
+    # Fable compiler is ready before the build steps.
     - name: Install dependencies
       run: npm ci
 
+    # Fable and Vite run as separate steps (instead of fable --run) so a
+    # failure or hang is attributable to one tool, and no child-process
+    # plumbing can swallow the exit.
+    - name: Compile F# with Fable
+      run: dotnet fable src/App.fsproj
+
     # GitHub Pages serves this project at https://<owner>.github.io/synth/,
     # so assets must be referenced under /synth/.
-    - name: Build project
-      run: npm run build
+    - name: Bundle with Vite
+      run: npx vite build
       env:
         DEPLOY_BASE: /synth/
 
