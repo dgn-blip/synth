@@ -422,10 +422,13 @@ let private tabBar (current: Tab) (dispatch: Msg -> unit) : ReactElement =
         prop.role "tablist"
         prop.children [
             for tab, label in tabs ->
+                // Bind first: passing `tab = current` inline would be parsed
+                // as a named method argument, not an equality test.
+                let isActive = tab = current
                 Html.button [
-                    prop.className (if tab = current then "tab tab-active" else "tab")
+                    prop.className (if isActive then "tab tab-active" else "tab")
                     prop.role "tab"
-                    prop.ariaSelected (tab = current)
+                    prop.ariaSelected isActive
                     prop.text label
                     prop.onClick (fun _ -> dispatch (SelectTab tab))
                 ]
