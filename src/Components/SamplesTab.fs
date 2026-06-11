@@ -57,7 +57,7 @@ let view (model: Model) (dispatch: Msg -> unit) : ReactElement =
             card "Upload Sample" [
                 Html.p [
                     prop.className "hint"
-                    prop.text "Upload WAV/MP3/OGG files. Pitched samples follow the keyboard; mapped samples trigger on a single key."
+                    prop.text "Upload WAV/MP3/OGG files. Pitched samples follow the keyboard — pitch changes but playback speed doesn't, so chords stay in sync. Mapped samples trigger on a single key."
                 ]
                 Html.label [
                     prop.className "file-drop"

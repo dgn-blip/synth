@@ -117,6 +117,76 @@ function makeImpulseResponse(roomSize) {
   return impulse;
 }
 
+// Granular pitch-shifter settings. Grains are short, overlapping slices of
+// the sample, each resampled to the target pitch but scheduled so the read
+// position advances through the buffer in REAL time. Pitch changes, duration
+// doesn't — so notes started together stay synchronized.
+const GRAIN_SIZE = 0.09; // seconds of audible output per grain
+const GRAIN_INTERVAL = 0.045; // new grain every 45 ms (50% overlap)
+const GRAIN_LOOKAHEAD = 0.15; // schedule grains this far ahead of the clock
+const GRAIN_TIMER_MS = 30; // how often the scheduler wakes up
+
+/**
+ * Play `buffer` into `destination` at `pitchRatio` without changing its
+ * duration (granular time-preserving pitch shift).
+ * Returns { stop() } — call stop to cease scheduling new grains; grains
+ * already scheduled ring out within GRAIN_SIZE seconds.
+ */
+function makeGranularPlayer(buffer, pitchRatio, destination, onComplete) {
+  const startTime = ctx.currentTime + 0.005;
+  let nextGrainTime = startTime;
+  let stopped = false;
+  let timer = null;
+
+  const stop = () => {
+    if (stopped) return;
+    stopped = true;
+    if (timer !== null) clearInterval(timer);
+  };
+
+  const schedule = () => {
+    while (!stopped && nextGrainTime < ctx.currentTime + GRAIN_LOOKAHEAD) {
+      // The read position advances at real-time speed, independent of pitch.
+      const sourcePos = nextGrainTime - startTime;
+      if (sourcePos >= buffer.duration) {
+        stop();
+        if (onComplete) onComplete();
+        return;
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.playbackRate.value = pitchRatio;
+
+      // Triangular fade per grain; overlapping grains crossfade smoothly.
+      const grainGain = ctx.createGain();
+      grainGain.gain.setValueAtTime(0, nextGrainTime);
+      grainGain.gain.linearRampToValueAtTime(1, nextGrainTime + GRAIN_SIZE / 2);
+      grainGain.gain.linearRampToValueAtTime(0, nextGrainTime + GRAIN_SIZE);
+      src.connect(grainGain);
+      grainGain.connect(destination);
+
+      // start(when, offset, duration): offset/duration are in buffer seconds.
+      // A grain audible for GRAIN_SIZE consumes GRAIN_SIZE * pitchRatio of
+      // source material because it plays at pitchRatio speed.
+      const sourceLen = Math.min(
+        GRAIN_SIZE * pitchRatio,
+        buffer.duration - sourcePos
+      );
+      src.start(nextGrainTime, sourcePos, sourceLen);
+      src.onended = () => {
+        try {
+          grainGain.disconnect();
+        } catch (_) {}
+      };
+      nextGrainTime += GRAIN_INTERVAL;
+    }
+  };
+
+  schedule();
+  timer = setInterval(schedule, GRAIN_TIMER_MS);
+  return { stop };
+}
+
 export class AudioEngine {
   // -------------------------------------------------------------------------
   // Initialization
@@ -453,33 +523,56 @@ export class AudioEngine {
       AudioEngine._releaseSampleVoice(key, existing, ctx.currentTime, 0.02);
     }
 
-    const source = ctx.createBufferSource();
-    source.buffer = sample.buffer;
-    if (sample.mode === "pitched") {
-      // Pitch-shift relative to middle C (60) via playback rate.
-      source.playbackRate.value = Math.pow(2, (midiNote - 60) / 12);
-    }
     const gain = ctx.createGain();
     gain.gain.value = sample.volume * velocity;
-    source.connect(gain);
     gain.connect(sampleLayerGain);
-    source.start();
-    source.onended = () => {
+
+    const cleanup = () => {
       playingSamples.delete(key);
-      try {
-        gain.disconnect();
-      } catch (_) {}
+      setTimeout(() => {
+        try {
+          gain.disconnect();
+        } catch (_) {}
+      }, (GRAIN_SIZE + 0.1) * 1000);
     };
-    playingSamples.set(key, { source, gain });
+
+    const pitchRatio = Math.pow(2, (midiNote - 60) / 12);
+    if (sample.mode === "pitched" && Math.abs(pitchRatio - 1) > 0.0001) {
+      // Granular pitch shift: pitch follows the key, but the playhead moves
+      // in real time — every note keeps the sample's original duration, so
+      // simultaneously pressed keys stay in sync.
+      const player = makeGranularPlayer(
+        sample.buffer,
+        pitchRatio,
+        gain,
+        cleanup
+      );
+      playingSamples.set(key, { gain, player });
+    } else {
+      // Mapped mode (or middle C, ratio 1): plain playback, best quality.
+      const source = ctx.createBufferSource();
+      source.buffer = sample.buffer;
+      source.connect(gain);
+      source.start();
+      source.onended = cleanup;
+      playingSamples.set(key, { gain, source });
+    }
   }
 
-  /** Internal: fade out and stop one sample voice. */
+  /** Internal: fade out and stop one sample voice (plain or granular). */
   static _releaseSampleVoice(key, entry, now, release) {
     try {
       entry.gain.gain.cancelScheduledValues(now);
       entry.gain.gain.setValueAtTime(entry.gain.gain.value, now);
       entry.gain.gain.linearRampToValueAtTime(0.0001, now + release);
-      entry.source.stop(now + release + 0.05);
+      if (entry.source) {
+        entry.source.stop(now + release + 0.05);
+      }
+      if (entry.player) {
+        // Keep scheduling grains through the release tail, then stop.
+        const player = entry.player;
+        setTimeout(() => player.stop(), (release + 0.1) * 1000);
+      }
     } catch (_) {
       /* source may have ended already */
     }
