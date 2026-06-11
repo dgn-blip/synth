@@ -6,31 +6,43 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# peaceiris/actions-gh-pages pushes the built site to the gh-pages branch.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
-    
+
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: '18'
-    
+        node-version: '20'
+        cache: 'npm'
+
+    # npm ci also runs the postinstall hook (dotnet tool restore), so the
+    # Fable compiler is ready before the build step.
     - name: Install dependencies
-      run: npm install
-    
+      run: npm ci
+
+    # GitHub Pages serves this project at https://<owner>.github.io/synth/,
+    # so assets must be referenced under /synth/.
     - name: Build project
       run: npm run build
-    
+      env:
+        DEPLOY_BASE: /synth/
+
     - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v3
+      if: github.event_name == 'push'
+      uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./dist
